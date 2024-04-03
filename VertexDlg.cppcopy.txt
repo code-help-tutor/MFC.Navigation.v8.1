@@ -1,0 +1,77 @@
+// VertexDlg.cpp : implementation file
+//
+
+#include "pch.h"
+#include "Navigation.h"
+#include "VertexDlg.h"
+#include "afxdialogex.h"
+
+
+// VertexDlg dialog
+
+IMPLEMENT_DYNAMIC(VertexDlg, CDialogEx)
+
+VertexDlg::VertexDlg(CWnd* pParent /*=nullptr*/)
+	: CDialogEx(IDD_VERTEX_DIALOG, pParent), readonly(false)
+{
+
+}
+
+VertexDlg::~VertexDlg()
+{
+}
+
+void VertexDlg::DoDataExchange(CDataExchange* pDX)
+{
+	CDialogEx::DoDataExchange(pDX);
+}
+
+BOOL VertexDlg::OnInitDialog() {
+    CDialogEx::OnInitDialog();
+
+    if (!vertexinfo.name.IsEmpty()) {
+        SetDlgItemText(IDC_EDIT_NAME, vertexinfo.name);
+        SetDlgItemText(IDC_EDIT_SUMMARY, vertexinfo.summary);
+    }
+
+    if (readonly) {
+        ((CEdit*)GetDlgItem(IDC_EDIT_NAME))->SetReadOnly(TRUE);
+        ((CEdit*)GetDlgItem(IDC_EDIT_SUMMARY))->SetReadOnly(TRUE);
+        ((CButton*)GetDlgItem(IDOK))->EnableWindow(FALSE);
+    }
+
+    return TRUE;  // return TRUE unless you set the focus to a control
+                  // EXCEPTION: OCX Property Pages should return FALSE
+}
+
+BEGIN_MESSAGE_MAP(VertexDlg, CDialogEx)
+    ON_BN_CLICKED(IDOK, &VertexDlg::OnBnClickedOk)
+END_MESSAGE_MAP()
+
+
+// VertexDlg message handlers
+
+
+void VertexDlg::OnBnClickedOk() {
+    if (!readonly) {
+        GetDlgItemText(IDC_EDIT_NAME, vertexinfo.name);
+        GetDlgItemText(IDC_EDIT_SUMMARY, vertexinfo.summary);
+
+        vertexinfo.name.Trim();
+        vertexinfo.name.Replace(TEXT(" "), TEXT(""));
+        if (vertexinfo.name.IsEmpty()) {
+            AfxMessageBox(TEXT("«Î ‰»Î√˚≥∆"));
+            return;
+        }
+
+        vertexinfo.summary.Trim();
+        vertexinfo.summary.Replace(TEXT(" "), TEXT(""));
+        if (vertexinfo.summary.IsEmpty()) {
+            AfxMessageBox(TEXT("«Î ‰»ÎºÚΩÈ"));
+            return;
+        }
+    }
+
+    CDialogEx::OnOK();
+}
+

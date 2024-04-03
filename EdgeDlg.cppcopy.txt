@@ -1,0 +1,103 @@
+// EdgeDlg.cpp : implementation file
+//
+
+#include "pch.h"
+#include "Navigation.h"
+#include "EdgeDlg.h"
+#include "afxdialogex.h"
+
+
+// EdgeDlg dialog
+
+IMPLEMENT_DYNAMIC(EdgeDlg, CDialogEx)
+
+EdgeDlg::EdgeDlg(CWnd* pParent /*=nullptr*/)
+	: CDialogEx(IDD_EDGE_DIALOG, pParent)
+{
+    graph = NULL;
+}
+
+EdgeDlg::~EdgeDlg()
+{
+}
+
+void EdgeDlg::DoDataExchange(CDataExchange* pDX)
+{
+    CDialogEx::DoDataExchange(pDX);
+    DDX_Control(pDX, IDC_COMBO_BEGIN, m_combo_begin);
+    DDX_Control(pDX, IDC_COMBO_END, m_combo_end);
+}
+
+
+BEGIN_MESSAGE_MAP(EdgeDlg, CDialogEx)
+    ON_BN_CLICKED(IDOK, &EdgeDlg::OnBnClickedOk)
+END_MESSAGE_MAP()
+
+
+// EdgeDlg message handlers
+
+
+BOOL EdgeDlg::OnInitDialog() {
+    CDialogEx::OnInitDialog();
+    initList();
+
+    if (!edgeinfo.begin.IsEmpty()) {
+        m_combo_begin.SetCurSel(m_combo_begin.FindString(0, edgeinfo.begin));
+        m_combo_end.SetCurSel(m_combo_end.FindString(0, edgeinfo.end));
+        m_combo_begin.EnableWindow(FALSE);
+        m_combo_end.EnableWindow(FALSE);
+
+        CString distance;
+        distance.Format(TEXT("%.2lf"), edgeinfo.distance);
+        SetDlgItemText(IDC_EDIT_DISTANCE, distance);
+        CString time;
+        time.Format(TEXT("%.2lf"), edgeinfo.time);
+        SetDlgItemText(IDC_EDIT_TIME, time);
+    }
+
+    return TRUE;  // return TRUE unless you set the focus to a control
+                  // EXCEPTION: OCX Property Pages should return FALSE
+}
+
+void EdgeDlg::initList() {
+    if (graph) {
+        for (size_t index = 0; index < graph->m_vertex_list.size(); ++index) {
+            const VertexInfo& info = graph->m_vertex_list[index];
+            m_combo_begin.AddString(info.name);
+            m_combo_end.AddString(info.name);
+        }
+    }
+}
+
+
+void EdgeDlg::OnBnClickedOk() {
+    int begin_index = m_combo_begin.GetCurSel();
+    if (begin_index == -1) {
+        AfxMessageBox(TEXT("请设置起点"));
+        return;
+    }
+
+    int end_index = m_combo_end.GetCurSel();
+    if (end_index == -1) {
+        AfxMessageBox(TEXT("请设置终点"));
+        return;
+    }
+
+    CString distance;
+    GetDlgItemText(IDC_EDIT_DISTANCE, distance);
+    CString time;
+    GetDlgItemText(IDC_EDIT_TIME, time);
+
+    m_combo_begin.GetWindowTextW(edgeinfo.begin);
+    m_combo_end.GetWindowTextW(edgeinfo.end);
+
+    if (edgeinfo.begin == edgeinfo.end) {
+        AfxMessageBox(TEXT("起点和终点不能相同"));
+        return;
+    }
+
+    edgeinfo.distance = _ttof(distance);
+    edgeinfo.time = _ttof(time);
+
+    CDialogEx::OnOK();
+}

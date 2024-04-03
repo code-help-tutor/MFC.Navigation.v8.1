@@ -1,0 +1,412 @@
+// EditDlg.cpp : implementation file
+//
+
+#include "pch.h"
+#include "Navigation.h"
+#include "EditDlg.h"
+#include "EdgeDlg.h"
+#include "VertexDlg.h"
+#include "HelpDlg.h"
+#include "RouteDlg.h"
+#include "afxdialogex.h"
+
+
+// EditDlg dialog
+
+IMPLEMENT_DYNAMIC(EditDlg, CDialogEx)
+
+EditDlg::EditDlg(CWnd* pParent /*=nullptr*/)
+	: CDialogEx(IDD_EDIT_DIALOG, pParent)
+{
+    m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+}
+
+EditDlg::~EditDlg()
+{
+}
+
+void EditDlg::DoDataExchange(CDataExchange* pDX)
+{
+    CDialogEx::DoDataExchange(pDX);
+    DDX_Control(pDX, IDC_LIST_VERTEX, m_ctrl_list_vertex);
+    DDX_Control(pDX, IDC_LIST_EDGE, m_ctrl_list_edge);
+}
+
+
+BEGIN_MESSAGE_MAP(EditDlg, CDialogEx)
+    ON_WM_PAINT()
+    ON_BN_CLICKED(IDC_BUTTON_VERTEX_ADD, &EditDlg::OnBnClickedButtonVertexAdd)
+    ON_BN_CLICKED(IDC_BUTTON_VERTEX_REMOVE, &EditDlg::OnBnClickedButtonVertexRemove)
+    ON_BN_CLICKED(IDC_BUTTON_EDGE_ADD, &EditDlg::OnBnClickedButtonEdgeAdd)
+    ON_BN_CLICKED(IDC_BUTTON_EDGE_REMOVE, &EditDlg::OnBnClickedButtonEdgeRemove)
+    ON_COMMAND(IDM_SAVE, &EditDlg::OnSave)
+    ON_COMMAND(IDM_QUIT, &EditDlg::OnQuit)
+    ON_NOTIFY(NM_DBLCLK, IDC_LIST_VERTEX, &EditDlg::OnDblclkListVertex)
+    ON_NOTIFY(NM_DBLCLK, IDC_LIST_EDGE, &EditDlg::OnDblclkListEdge)
+    ON_EN_CHANGE(IDC_EDIT_KEYWORD, &EditDlg::OnChangeEditKeyword)
+    ON_WM_LBUTTONDOWN()
+    ON_WM_RBUTTONDOWN()
+    ON_WM_MOUSEMOVE()
+    ON_WM_LBUTTONDBLCLK()
+    ON_COMMAND(IDM_HELP, &EditDlg::OnHelp)
+    ON_COMMAND(IDM_ROUTE, &EditDlg::OnRoute)
+END_MESSAGE_MAP()
+
+
+// EditDlg message handlers
+void EditDlg::OnPaint() {
+    if (IsIconic()) {
+        CPaintDC dc(this); // device context for painting
+
+        SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
+
+        // Center icon in client rectangle
+        int cxIcon = GetSystemMetrics(SM_CXICON);
+        int cyIcon = GetSystemMetrics(SM_CYICON);
+        CRect rect;
+        GetClientRect(&rect);
+        int x = (rect.Width() - cxIcon + 1) / 2;
+        int y = (rect.Height() - cyIcon + 1) / 2;
+
+        // Draw the icon
+        dc.DrawIcon(x, y, m_hIcon);
+    } else {
+        m_canvas.update();
+        CDialogEx::OnPaint();
+    }
+}
+
+void EditDlg::OnBnClickedButtonVertexAdd() {
+    VertexDlg dlg;
+    if (dlg.DoModal() == IDOK) {
+        if (m_engine.addVertex(dlg.vertexinfo)) {
+            updateCListCtrlVertex();
+            m_canvas.update();
+        } else {
+            AfxMessageBox(TEXT("添加失败"));
+        }
+    }
+}
+
+
+void EditDlg::OnBnClickedButtonVertexRemove() {
+    int nIdx = m_ctrl_list_vertex.GetSelectionMark();
+    if (nIdx < 0) {
+        AfxMessageBox(_T("请从列表中选择要删除的项!"));
+    } else {
+        CString name = m_ctrl_list_vertex.GetItemText(nIdx, 0);
+        if (m_engine.getGraphInfo().removeVertex(name)) {
+            updateCListCtrlVertex();
+            updateCListCtrlEdge();
+            m_canvas.update();
+        } else {
+            AfxMessageBox(TEXT("删除失败！"));
+        }
+    }
+}
+
+
+void EditDlg::OnBnClickedButtonEdgeAdd() {
+    EdgeDlg dlg;
+    dlg.graph = &m_engine.getGraphInfo();
+    if (dlg.DoModal() == IDOK) {
+        if (m_engine.addEdge(dlg.edgeinfo)) {
+            updateCListCtrlEdge();
+            m_canvas.update();
+        } else {
+            AfxMessageBox(TEXT("添加失败"));
+        }
+    }
+}
+
+
+void EditDlg::OnBnClickedButtonEdgeRemove() {
+    int nIdx = m_ctrl_list_edge.GetSelectionMark();
+    if (nIdx < 0) {
+        AfxMessageBox(_T("请从列表中选择要删除的项!"));
+    } else {
+        CString begin = m_ctrl_list_edge.GetItemText(nIdx, 0);
+        CString end = m_ctrl_list_edge.GetItemText(nIdx, 1);
+        if (m_engine.getGraphInfo().removeEdge(begin, end)) {
+            updateCListCtrlEdge();
+            m_canvas.update();
+        } else {
+            AfxMessageBox(TEXT("删除失败！"));
+        }
+    }
+}
+
+void EditDlg::OnSave() {
+    m_engine.saveFile(GRAPH_FILE);
+}
+
+
+void EditDlg::OnQuit() {
+    CDialogEx::OnCancel();
+}
+
+
+void EditDlg::OnHelp() {
+    HelpDlg dlg;
+    dlg.DoModal();
+}
+
+void EditDlg::OnRoute() {
+    RouteDlg dlg;
+    dlg.m_modify = true;
+    dlg.DoModal();
+}
+
+void EditDlg::OnLButtonDown(UINT nFlags, CPoint point) {
+    CRect rect;
+    GetDlgItem(IDC_STATIC_CANVAS)->GetWindowRect(&rect);
+    ScreenToClient(&rect);
+    int x = point.x - rect.left;
+    int y = point.y - rect.top;
+    VertexInfo* vertex = m_engine.getGraphInfo().hitVertex(x, y);
+    if (vertex) {
+        if ((::GetKeyState(VK_CONTROL) & 0x80)) {
+            if (!m_last_name.IsEmpty()) {
+                EdgeInfo* edge = m_engine.getGraphInfo().findEdge(m_last_name, vertex->name);
+                if (edge) {
+                    EdgeDlg dlg;
+                    dlg.graph = &m_engine.getGraphInfo();
+                    dlg.edgeinfo = *edge;
+                    if (dlg.DoModal() == IDOK) {
+                        *edge = dlg.edgeinfo;
+                        m_engine.getGraphInfo().updateEdge(*edge);
+                        updateCListCtrlEdge();
+                        m_canvas.update();
+                    }
+                } else {
+                    EdgeDlg dlg;
+                    dlg.graph = &m_engine.getGraphInfo();
+                    dlg.edgeinfo.begin = m_last_name;
+                    dlg.edgeinfo.end = vertex->name;
+                    if (dlg.DoModal() == IDOK) {
+                        if (m_engine.addEdge(dlg.edgeinfo)) {
+                            updateCListCtrlEdge();
+                            m_canvas.update();
+                        } else {
+                            AfxMessageBox(TEXT("添加失败"));
+                        }
+                    }
+                }
+                m_last_name = TEXT("");
+            } else {
+                m_last_name = vertex->name;
+            }
+        } else {
+            m_engine.onMouseEvent(MOUSE_EVENT_TYPE::LBUTTON, x, y);
+            //int nIdx = m_ctrl_list_vertex.GetSelectionMark();
+            //if (nIdx >= 0) {
+            //    CString name = m_ctrl_list_vertex.GetItemText(nIdx, 0);
+            //    VertexInfo* info = m_engine.getGraphInfo().findVertex(name);
+            //    if (info) {
+            //        info->x = x;
+            //        info->y = y;
+            //        info->update();
+            //        m_engine.getGraphInfo().updateEdge();
+            //    }
+            //}
+            m_engine.move(MOUSE_EVENT_TYPE::LBUTTON, x, y);
+            m_canvas.update();
+        }
+    }
+    CDialogEx::OnLButtonDown(nFlags, point);
+}
+
+void EditDlg::OnRButtonDown(UINT nFlags, CPoint point) {
+    CRect rect;
+    GetDlgItem(IDC_STATIC_CANVAS)->GetWindowRect(&rect);
+    ScreenToClient(&rect);
+    int x = point.x - rect.left;
+    int y = point.y - rect.top;
+    m_engine.onMouseEvent(MOUSE_EVENT_TYPE::RBUTTON, x, y);
+    m_canvas.update();
+    m_engine.move(MOUSE_EVENT_TYPE::RBUTTON, x, y);
+    CDialogEx::OnRButtonDown(nFlags, point);
+}
+
+
+void EditDlg::OnLButtonDblClk(UINT nFlags, CPoint point) {
+    CRect rect;
+    GetDlgItem(IDC_STATIC_CANVAS)->GetWindowRect(&rect);
+    ScreenToClient(&rect);
+    int x = point.x - rect.left;
+    int y = point.y - rect.top;
+    m_engine.onMouseEvent(MOUSE_EVENT_TYPE::RBUTTON, x, y);
+    VertexInfo* info = m_engine.getGraphInfo().hitVertex(x, y);
+    if (info) {
+        VertexDlg dlg;
+        dlg.vertexinfo = *info;
+        if (dlg.DoModal() == IDOK) {
+            if (m_engine.getGraphInfo().canRenameVertex(dlg.vertexinfo.name, info)) {
+                m_engine.getGraphInfo().renameEdge(info->name, dlg.vertexinfo.name);
+                *info = dlg.vertexinfo;
+                info->update();
+                updateCListCtrlVertex();
+                updateCListCtrlEdge();
+                m_canvas.update();
+            } else {
+                AfxMessageBox(TEXT("存在重复名称，操作失败！"));
+            }
+        }
+
+        CString type;
+        CString begin;
+        CString end;
+        CString output;
+        m_engine.search(MOUSE_EVENT_TYPE::RBUTTON, x, y, type, begin, end, output);
+    }
+    CDialogEx::OnLButtonDblClk(nFlags, point);
+}
+
+
+void EditDlg::OnMouseMove(UINT nFlags, CPoint point) {
+    CRect rect;
+    GetDlgItem(IDC_STATIC_CANVAS)->GetWindowRect(&rect);
+    ScreenToClient(&rect);
+    int x = point.x - rect.left;
+    int y = point.y - rect.top;
+    m_engine.onMouseEvent(MOUSE_EVENT_TYPE::MOVE, x, y);
+    m_canvas.update();
+    m_engine.move(MOUSE_EVENT_TYPE::MOVE, x, y);
+    CDialogEx::OnMouseMove(nFlags, point);
+}
+
+void EditDlg::OnDblclkListVertex(NMHDR* pNMHDR, LRESULT* pResult) {
+    LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+    CString name = m_ctrl_list_vertex.GetItemText(pNMItemActivate->iItem, 0);
+    VertexInfo* info = m_engine.getGraphInfo().findVertex(name);
+    if (info) {
+        VertexDlg dlg;
+        dlg.vertexinfo = *info;
+        if (dlg.DoModal() == IDOK) {
+            if (m_engine.getGraphInfo().canRenameVertex(dlg.vertexinfo.name, info)) {
+                m_engine.getGraphInfo().renameEdge(info->name, dlg.vertexinfo.name);
+                *info = dlg.vertexinfo;
+                info->update();
+                updateCListCtrlVertex();
+                updateCListCtrlEdge();
+                m_canvas.update();
+            } else {
+                AfxMessageBox(TEXT("存在重复名称，操作失败！"));
+            }
+        }
+    }
+    *pResult = 0;
+}
+
+void EditDlg::OnDblclkListEdge(NMHDR* pNMHDR, LRESULT* pResult) {
+    LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
+    CString begin = m_ctrl_list_edge.GetItemText(pNMItemActivate->iItem, 0);
+    CString end = m_ctrl_list_edge.GetItemText(pNMItemActivate->iItem, 1);
+    EdgeInfo* info = m_engine.getGraphInfo().findEdge(begin, end);
+    if (info) {
+        EdgeDlg dlg;
+        dlg.graph = &m_engine.getGraphInfo();
+        dlg.edgeinfo = *info;
+        if (dlg.DoModal() == IDOK) {
+            *info = dlg.edgeinfo;
+            m_engine.getGraphInfo().updateEdge(*info);
+            updateCListCtrlEdge();
+            m_canvas.update();
+        }
+    }
+    *pResult = 0;
+}
+
+void EditDlg::OnChangeEditKeyword() {
+    updateCListCtrlVertex();
+    updateCListCtrlEdge();
+}
+
+BOOL EditDlg::OnInitDialog() {
+    CDialogEx::OnInitDialog();
+
+    // Set the icon for this dialog.  The framework does this automatically
+    // when the application's main window is not a dialog
+    SetIcon(m_hIcon, TRUE);			// Set big icon
+    SetIcon(m_hIcon, FALSE);		// Set small icon
+
+    initCListCtrlVertex();
+    initCListCtrlEdge();
+
+    m_engine.loadFile(GRAPH_FILE);
+    updateCListCtrlVertex();
+    updateCListCtrlEdge();
+
+    m_canvas.init(&m_engine, this, IDC_STATIC_CANVAS);
+    m_canvas.update();
+    return TRUE;  // return TRUE unless you set the focus to a control
+                  // EXCEPTION: OCX Property Pages should return FALSE
+}
+
+
+void EditDlg::OnOK() {
+
+}
+
+void EditDlg::initCListCtrlVertex() {
+    LONG styles;
+    //获取窗口风格
+    styles = GetWindowLong(m_ctrl_list_vertex.m_hWnd, GWL_STYLE);
+    //设置窗口风格
+    SetWindowLong(m_ctrl_list_vertex.m_hWnd, GWL_STYLE, styles | LVS_REPORT);
+    ListView_SetExtendedListViewStyle(m_ctrl_list_vertex.m_hWnd, m_ctrl_list_vertex.GetStyle() | LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT);
+    //设置列表框控件标题
+    m_ctrl_list_vertex.InsertColumn(0, L"名称", LVCFMT_LEFT, 100);
+    m_ctrl_list_vertex.InsertColumn(1, L"简介", LVCFMT_LEFT, 150);
+}
+
+void EditDlg::initCListCtrlEdge() {
+    LONG styles;
+    //获取窗口风格
+    styles = GetWindowLong(m_ctrl_list_edge.m_hWnd, GWL_STYLE);
+    //设置窗口风格
+    SetWindowLong(m_ctrl_list_edge.m_hWnd, GWL_STYLE, styles | LVS_REPORT);
+    ListView_SetExtendedListViewStyle(m_ctrl_list_edge.m_hWnd, m_ctrl_list_edge.GetStyle() | LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT);
+    //设置列表框控件标题
+    m_ctrl_list_edge.InsertColumn(0, L"起点", LVCFMT_LEFT, 100);
+    m_ctrl_list_edge.InsertColumn(1, L"终点", LVCFMT_LEFT, 100);
+    m_ctrl_list_edge.InsertColumn(2, L"权重", LVCFMT_LEFT, 100);
+}
+
+void EditDlg::updateCListCtrlVertex() {
+    CString keyword;
+    GetDlgItemText(IDC_EDIT_KEYWORD, keyword);
+    keyword.Trim();
+    m_ctrl_list_vertex.SetRedraw(FALSE);
+    m_ctrl_list_vertex.DeleteAllItems();
+    for (std::vector<VertexInfo>::reverse_iterator iter = m_engine.getGraphInfo().m_vertex_list.rbegin(); iter != m_engine.getGraphInfo().m_vertex_list.rend(); ++iter) {
+        const VertexInfo& info = *iter;
+        if (keyword.IsEmpty() || info.name.Find(keyword, 0) != -1) {
+            int row = m_ctrl_list_vertex.InsertItem(m_ctrl_list_vertex.GetItemCount(), info.name);
+            m_ctrl_list_vertex.SetItemText(row, 1, info.summary);
+        }
+    }
+    m_ctrl_list_vertex.SetRedraw(TRUE);
+    m_ctrl_list_vertex.Update(0);
+}
+
+void EditDlg::updateCListCtrlEdge() {
+    CString keyword;
+    GetDlgItemText(IDC_EDIT_KEYWORD, keyword);
+    keyword.Trim();
+    m_ctrl_list_edge.SetRedraw(FALSE);
+    m_ctrl_list_edge.DeleteAllItems();
+    m_ctrl_list_edge.DeleteAllItems();
+    for (std::vector<EdgeInfo>::reverse_iterator iter = m_engine.getGraphInfo().m_edge_list.rbegin(); iter != m_engine.getGraphInfo().m_edge_list.rend(); ++iter) {
+        const EdgeInfo& info = *iter;
+        if (keyword.IsEmpty() || (info.begin.Find(keyword, 0) != -1 || info.end.Find(keyword, 0) != -1)) {
+            int row = m_ctrl_list_edge.InsertItem(m_ctrl_list_edge.GetItemCount(), info.begin);
+            m_ctrl_list_edge.SetItemText(row, 1, info.end);
+            CString weight;
+            weight.Format(TEXT("%G, %G"), info.distance, info.time);
+            m_ctrl_list_edge.SetItemText(row, 2, weight);
+        }
+    }
+    m_ctrl_list_edge.SetRedraw(TRUE);
+    m_ctrl_list_edge.Update(0);
+}

@@ -1,0 +1,132 @@
+// RouteDlg.cpp : implementation file
+//
+
+#include "pch.h"
+#include "Navigation.h"
+#include "RouteDlg.h"
+#include "LineDlg.h"
+#include "afxdialogex.h"
+
+
+// RouteDlg dialog
+
+IMPLEMENT_DYNAMIC(RouteDlg, CDialogEx)
+
+RouteDlg::RouteDlg(CWnd* pParent /*=nullptr*/)
+	: CDialogEx(IDD_ROUTE_DIALOG, pParent), m_modify(false)
+{
+
+}
+
+RouteDlg::~RouteDlg()
+{
+}
+
+void RouteDlg::DoDataExchange(CDataExchange* pDX)
+{
+    CDialogEx::DoDataExchange(pDX);
+    DDX_Control(pDX, IDC_LIST, m_ctrl_list);
+}
+
+
+BEGIN_MESSAGE_MAP(RouteDlg, CDialogEx)
+    ON_BN_CLICKED(IDC_BUTTON_ADD, &RouteDlg::OnBnClickedButtonAdd)
+    ON_BN_CLICKED(IDC_BUTTON_REMOVE, &RouteDlg::OnBnClickedButtonRemove)
+    ON_EN_CHANGE(IDC_EDIT_KEYWORD, &RouteDlg::OnEnChangeEditWord)
+END_MESSAGE_MAP()
+
+
+// RouteDlg message handlers
+
+
+BOOL RouteDlg::OnInitDialog() {
+    CDialogEx::OnInitDialog();
+
+    // TODO:  Add extra initialization here
+    m_list.loadFile(TEXT("RouteInfo.txt"));
+    initCListCtrl();
+    updateCListCtrl();
+
+    if (m_modify) {
+        ((CButton*)GetDlgItem(IDC_BUTTON_ADD))->EnableWindow(TRUE);
+        ((CButton*)GetDlgItem(IDC_BUTTON_REMOVE))->EnableWindow(TRUE);
+    } else {
+        ((CButton*)GetDlgItem(IDC_BUTTON_ADD))->EnableWindow(FALSE);
+        ((CButton*)GetDlgItem(IDC_BUTTON_REMOVE))->EnableWindow(FALSE);
+    }
+
+    return TRUE;  // return TRUE unless you set the focus to a control
+                  // EXCEPTION: OCX Property Pages should return FALSE
+}
+
+
+void RouteDlg::OnOK() {
+    CDialogEx::OnOK();
+}
+
+
+void RouteDlg::OnBnClickedButtonAdd() {
+    LineDlg dlg;
+    if (dlg.DoModal() == IDOK) {
+        if (m_list.add(dlg.m_info)) {
+            updateCListCtrl();
+            m_list.saveFile(TEXT("RouteInfo.txt"));
+            AfxMessageBox(TEXT("添加成功！"));
+        } else {
+            AfxMessageBox(TEXT("添加失败！"));
+        }
+    }
+}
+
+
+void RouteDlg::OnBnClickedButtonRemove() {
+    int nIdx = m_ctrl_list.GetSelectionMark();
+    if (nIdx < 0) {
+        AfxMessageBox(_T("请从列表中选择要删除的项!"));
+    } else {
+        CString name = m_ctrl_list.GetItemText(nIdx, 0);
+        if (m_list.remove(name)) {
+            updateCListCtrl();
+            m_list.saveFile(TEXT("RouteInfo.txt"));
+            AfxMessageBox(TEXT("删除成功！"));
+        } else {
+            AfxMessageBox(TEXT("删除失败！"));
+        }
+    }
+}
+
+void RouteDlg::initCListCtrl() {
+    LONG styles;
+    //获取窗口风格
+    styles = GetWindowLong(m_ctrl_list.m_hWnd, GWL_STYLE);
+    //设置窗口风格
+    SetWindowLong(m_ctrl_list.m_hWnd, GWL_STYLE, styles | LVS_REPORT);
+    ListView_SetExtendedListViewStyle(m_ctrl_list.m_hWnd, m_ctrl_list.GetStyle() | LVS_EX_GRIDLINES | LVS_EX_FULLROWSELECT);
+    //设置列表框控件标题
+    m_ctrl_list.InsertColumn(0, L"班次", LVCFMT_LEFT, 100);
+    m_ctrl_list.InsertColumn(1, L"首班车时间", LVCFMT_LEFT, 150);
+    m_ctrl_list.InsertColumn(2, L"末班车时间", LVCFMT_LEFT, 150);
+    m_ctrl_list.InsertColumn(3, L"途经路线", LVCFMT_LEFT, 500);
+}
+
+void RouteDlg::updateCListCtrl() {
+
+    CString word;
+    GetDlgItemText(IDC_EDIT_KEYWORD, word);
+    word.Trim();
+
+    m_ctrl_list.DeleteAllItems();
+    for (std::vector<RouteInfo>::iterator iter = m_list.m_list.begin(); iter != m_list.m_list.end(); ++iter) {
+        const RouteInfo& info = *iter;
+        if (word.IsEmpty() || info.name.Find(word) != -1) {
+            int row = m_ctrl_list.InsertItem(m_ctrl_list.GetItemCount(), info.name);
+            m_ctrl_list.SetItemText(row, 1, info.first);
+            m_ctrl_list.SetItemText(row, 2, info.last);
+            m_ctrl_list.SetItemText(row, 3, info.stations);
+        }
+    }
+}
+
+void RouteDlg::OnEnChangeEditWord() {
+    updateCListCtrl();
+}

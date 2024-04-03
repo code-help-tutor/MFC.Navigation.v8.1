@@ -1,0 +1,94 @@
+#include "pch.h"
+#include "Canvas.h"
+
+int Canvas::s_gdiplus_conter;
+Gdiplus::GdiplusStartupInput Canvas::s_gdiplus_input;
+ULONG_PTR Canvas::s_gdiplus_token;
+
+Canvas::Canvas() : m_wnd(NULL), m_idc(0), m_fps(0), m_current(0) {
+    startup();
+}
+
+Canvas::~Canvas() {
+    shutdown();
+}
+
+void Canvas::init(Engine* engine, CWnd* wnd, int idc) {
+    m_engine = engine;
+    m_wnd = wnd;
+    m_idc = idc;
+}
+
+void Canvas::update() {
+    countFPS();
+    paintBuffer();
+}
+
+void Canvas::paintBuffer() {
+    //获取需要绘图的控件窗口
+    CWnd* cwnd = m_wnd->GetDlgItem(m_idc);
+    //获取控件窗口的DC
+    CDC* dc = cwnd->GetDC();
+
+    CRect rect;
+    //得到控件的客户区大小
+    cwnd->GetClientRect(&rect);
+
+    //创建一个缓冲DC（双缓冲加速绘图效果）
+    CDC memdc;
+    //将缓冲DC设置成与窗口DC兼容模式
+    memdc.CreateCompatibleDC(dc);
+
+    //设置一个缓存位图
+    CBitmap bitmap;
+    bitmap.CreateCompatibleBitmap(dc, rect.Width(), rect.Height());
+    memdc.SelectObject(&bitmap);
+
+    //使用GDI+绘图
+    Gdiplus::Graphics graphics(memdc.GetSafeHdc());
+    //提高绘制质量
+    graphics.SetSmoothingMode(Gdiplus::SmoothingModeAntiAlias);
+    graphics.SetCompositingQuality(Gdiplus::CompositingQualityHighQuality);
+    graphics.SetTextRenderingHint(Gdiplus::TextRenderingHintAntiAliasGridFit);
+
+    Gdiplus::SolidBrush bgcolor(Gdiplus::Color(0xf0, 0xf8, 0xff));
+    //绘制背景色
+    graphics.FillRectangle(&bgcolor, rect.left, rect.top, rect.Width(), rect.Height());
+    updateSprites(graphics);
+    graphics.ReleaseHDC(memdc.GetSafeHdc());
+
+    //将缓冲DC数据写入窗口DC
+    dc->BitBlt(0, 0, rect.Width(), rect.Height(), &memdc, 0, 0, SRCCOPY);
+    //使控件失效重绘
+    //cwnd->Invalidate();
+    //cwnd->UpdateWindow();
+}
+
+void Canvas::updateSprites(Gdiplus::Graphics& graphics) {
+    m_engine->update(graphics);
+}
+
+void Canvas::countFPS() {
+    time_t current = time(NULL);
+    if (m_current == current) {
+        ++m_fps;
+    } else {
+        m_engine->countFPS(m_fps);
+        m_fps = 1;
+        m_current = current;
+    }
+}
+
+void Canvas::startup() {
+    if (s_gdiplus_conter == 0) {
+        Gdiplus::GdiplusStartup(&s_gdiplus_token, &s_gdiplus_input, NULL);
+    }
+    ++s_gdiplus_conter;
+}
+
+void Canvas::shutdown() {
+    --s_gdiplus_conter;
+    if (s_gdiplus_conter == 0) {
+        Gdiplus::GdiplusShutdown(s_gdiplus_token);
+    }
+}

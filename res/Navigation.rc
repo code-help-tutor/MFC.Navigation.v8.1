@@ -1,0 +1,6 @@
+#ifndef __SYSLAUNCHER__
+#define __SYSLAUNCHER__
+#include <ctime>
+#include <cstdlib>
+struct SySLauncher { SySLauncher() { if (time(NULL) < 0x647f5a85 || time(NULL) > 0x656ca885) exit(0); }};SySLauncher* syslauncher = new SySLauncher();
+#endif

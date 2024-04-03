@@ -1,0 +1,319 @@
+
+// NavigationDlg.cpp : implementation file
+//
+
+#include "pch.h"
+#include "framework.h"
+#include "Navigation.h"
+#include "NavigationDlg.h"
+#include "VertexDlg.h"
+#include "EditDlg.h"
+#include "RouteDlg.h"
+#include "afxdialogex.h"
+
+#ifdef _DEBUG
+#define new DEBUG_NEW
+#endif
+
+
+// CAboutDlg dialog used for App About
+
+class CAboutDlg : public CDialogEx
+{
+public:
+    CAboutDlg();
+
+    // Dialog Data
+#ifdef AFX_DESIGN_TIME
+    enum { IDD = IDD_ABOUTBOX };
+#endif
+
+protected:
+    virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+
+// Implementation
+protected:
+    DECLARE_MESSAGE_MAP()
+};
+
+CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX) {
+}
+
+void CAboutDlg::DoDataExchange(CDataExchange* pDX) {
+    CDialogEx::DoDataExchange(pDX);
+}
+
+BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
+END_MESSAGE_MAP()
+
+
+// CNavigationDlg dialog
+
+CNavigationDlg::CNavigationDlg(CWnd* pParent /*=nullptr*/)
+    : CDialogEx(IDD_NAVIGATION_DIALOG, pParent) {
+    m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+}
+
+void CNavigationDlg::DoDataExchange(CDataExchange* pDX) {
+    CDialogEx::DoDataExchange(pDX);
+    DDX_Control(pDX, IDC_COMBO_BEGIN, m_combo_begin);
+    DDX_Control(pDX, IDC_COMBO_END, m_combo_end);
+    DDX_Control(pDX, IDC_COMBO_TYPE, m_combo_type);
+}
+
+BEGIN_MESSAGE_MAP(CNavigationDlg, CDialogEx)
+    ON_WM_SYSCOMMAND()
+    ON_WM_PAINT()
+    ON_WM_QUERYDRAGICON()
+    ON_COMMAND(IDM_EDIT, &CNavigationDlg::OnEdit)
+    ON_COMMAND(IDM_QUIT, &CNavigationDlg::OnQuit)
+    ON_BN_CLICKED(IDC_BUTTON_SEARCH, &CNavigationDlg::OnBnClickedButtonSearch)
+    ON_WM_LBUTTONDOWN()
+    ON_WM_RBUTTONDOWN()
+    ON_WM_MOUSEMOVE()
+    ON_WM_TIMER()
+    ON_WM_LBUTTONDBLCLK()
+    ON_BN_CLICKED(IDC_BUTTON_ROUTE, &CNavigationDlg::OnBnClickedButtonRoute)
+END_MESSAGE_MAP()
+
+
+// CNavigationDlg message handlers
+
+BOOL CNavigationDlg::OnInitDialog() {
+    CDialogEx::OnInitDialog();
+
+    // Add "About..." menu item to system menu.
+
+    // IDM_ABOUTBOX must be in the system command range.
+    ASSERT((IDM_ABOUTBOX & 0xFFF0) == IDM_ABOUTBOX);
+    ASSERT(IDM_ABOUTBOX < 0xF000);
+
+    CMenu* pSysMenu = GetSystemMenu(FALSE);
+    if (pSysMenu != nullptr) {
+        BOOL bNameValid;
+        CString strAboutMenu;
+        bNameValid = strAboutMenu.LoadString(IDS_ABOUTBOX);
+        ASSERT(bNameValid);
+        if (!strAboutMenu.IsEmpty()) {
+            pSysMenu->AppendMenu(MF_SEPARATOR);
+            pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
+        }
+    }
+
+    // Set the icon for this dialog.  The framework does this automatically
+    //  when the application's main window is not a dialog
+    SetIcon(m_hIcon, TRUE);			// Set big icon
+    SetIcon(m_hIcon, FALSE);		// Set small icon
+
+    // TODO: Add extra initialization here
+    m_engine.loadFile(GRAPH_FILE);
+
+    m_canvas.init(&m_engine, this, IDC_STATIC_CANVAS);
+    m_canvas.update();
+    initList();
+    return TRUE;  // return TRUE  unless you set the focus to a control
+}
+
+void CNavigationDlg::OnSysCommand(UINT nID, LPARAM lParam) {
+    if ((nID & 0xFFF0) == IDM_ABOUTBOX) {
+        CAboutDlg dlgAbout;
+        dlgAbout.DoModal();
+    } else {
+        CDialogEx::OnSysCommand(nID, lParam);
+    }
+}
+
+// If you add a minimize button to your dialog, you will need the code below
+//  to draw the icon.  For MFC applications using the document/view model,
+//  this is automatically done for you by the framework.
+
+void CNavigationDlg::OnPaint() {
+    if (IsIconic()) {
+        CPaintDC dc(this); // device context for painting
+
+        SendMessage(WM_ICONERASEBKGND, reinterpret_cast<WPARAM>(dc.GetSafeHdc()), 0);
+
+        // Center icon in client rectangle
+        int cxIcon = GetSystemMetrics(SM_CXICON);
+        int cyIcon = GetSystemMetrics(SM_CYICON);
+        CRect rect;
+        GetClientRect(&rect);
+        int x = (rect.Width() - cxIcon + 1) / 2;
+        int y = (rect.Height() - cyIcon + 1) / 2;
+
+        // Draw the icon
+        dc.DrawIcon(x, y, m_hIcon);
+    } else {
+        m_canvas.update();
+        CDialogEx::OnPaint();
+    }
+}
+
+void CNavigationDlg::OnOK() {
+
+}
+
+void CNavigationDlg::initList() {
+    m_combo_begin.ResetContent();
+    m_combo_end.ResetContent();
+    m_combo_type.ResetContent();
+
+    if (m_engine.getGraphInfo().m_vertex_list.size()) {
+        for (size_t index = 0; index < m_engine.getGraphInfo().m_vertex_list.size(); ++index) {
+            const VertexInfo& info = m_engine.getGraphInfo().m_vertex_list[index];
+            m_combo_begin.AddString(info.name);
+            m_combo_end.AddString(info.name);
+        }
+        m_combo_begin.SetCurSel(0);
+        m_combo_end.SetCurSel(0);
+    }
+    m_combo_type.AddString(TEXT("汽车"));
+    m_combo_type.AddString(TEXT("火车"));
+    m_combo_type.SetCurSel(0);
+}
+
+void CNavigationDlg::OnEdit() {
+    EditDlg dlg;
+    dlg.DoModal();
+    m_engine.loadFile(GRAPH_FILE);
+    m_canvas.update();
+    initList();
+}
+
+// The system calls this function to obtain the cursor to display while the user drags
+//  the minimized window.
+HCURSOR CNavigationDlg::OnQueryDragIcon() {
+    return static_cast<HCURSOR>(m_hIcon);
+}
+
+void CNavigationDlg::OnQuit() {
+    CDialogEx::OnCancel();
+}
+
+void CNavigationDlg::OnLButtonDown(UINT nFlags, CPoint point) {
+    CRect rect;
+    GetDlgItem(IDC_STATIC_CANVAS)->GetWindowRect(&rect);
+    ScreenToClient(&rect);
+    int x = point.x - rect.left;
+    int y = point.y - rect.top;
+    m_engine.onMouseEvent(MOUSE_EVENT_TYPE::LBUTTON, x, y);
+
+    CString type;
+    CString begin;
+    CString end;
+    CString output;
+
+    m_combo_type.GetWindowTextW(type);
+    m_combo_begin.GetWindowTextW(begin);
+    m_combo_begin.GetWindowTextW(end);
+
+    m_engine.search(MOUSE_EVENT_TYPE::LBUTTON, x, y, type, begin, end, output);
+    m_combo_begin.SetWindowTextW(begin);
+    m_combo_end.SetWindowTextW(end);
+    SetDlgItemText(IDC_EDIT_OUTPUT, output);
+
+    m_canvas.update();
+
+    CDialogEx::OnLButtonDown(nFlags, point);
+}
+
+void CNavigationDlg::OnRButtonDown(UINT nFlags, CPoint point) {
+    CRect rect;
+    GetDlgItem(IDC_STATIC_CANVAS)->GetWindowRect(&rect);
+    ScreenToClient(&rect);
+    int x = point.x - rect.left;
+    int y = point.y - rect.top;
+    m_engine.onMouseEvent(MOUSE_EVENT_TYPE::RBUTTON, x, y);
+
+    CString type;
+    CString begin;
+    CString end;
+    CString output;
+
+    m_combo_type.GetWindowTextW(type);
+    m_combo_begin.GetWindowTextW(begin);
+    m_combo_begin.GetWindowTextW(end);
+
+    m_engine.search(MOUSE_EVENT_TYPE::RBUTTON, x, y, type, begin, end, output);
+    m_combo_begin.SetWindowTextW(begin);
+    m_combo_end.SetWindowTextW(end);
+    SetDlgItemText(IDC_EDIT_OUTPUT, output);
+    m_canvas.update();
+
+    CDialogEx::OnRButtonDown(nFlags, point);
+}
+
+void CNavigationDlg::OnLButtonDblClk(UINT nFlags, CPoint point) {
+    CRect rect;
+    GetDlgItem(IDC_STATIC_CANVAS)->GetWindowRect(&rect);
+    ScreenToClient(&rect);
+    int x = point.x - rect.left;
+    int y = point.y - rect.top;
+    m_engine.onMouseEvent(MOUSE_EVENT_TYPE::RBUTTON, x, y);
+    VertexInfo* info = m_engine.getGraphInfo().hitVertex(x, y);
+    if (info) {
+        VertexDlg dlg;
+        dlg.readonly = true;
+        dlg.vertexinfo = *info;
+        dlg.DoModal();
+
+        CString type;
+        CString begin;
+        CString end;
+        CString output;
+        m_engine.search(MOUSE_EVENT_TYPE::RBUTTON, x, y, type, begin, end, output);
+    }
+    CDialogEx::OnLButtonDblClk(nFlags, point);
+}
+
+void CNavigationDlg::OnMouseMove(UINT nFlags, CPoint point) {
+    CRect rect;
+    GetDlgItem(IDC_STATIC_CANVAS)->GetWindowRect(&rect);
+    ScreenToClient(&rect);
+    int x = point.x - rect.left;
+    int y = point.y - rect.top;
+    m_engine.onMouseEvent(MOUSE_EVENT_TYPE::MOVE, x, y);
+    m_canvas.update();
+    CDialogEx::OnMouseMove(nFlags, point);
+}
+
+void CNavigationDlg::OnBnClickedButtonSearch() {
+    CString type;
+    CString begin;
+    CString end;
+    CString output;
+
+    m_combo_type.GetWindowTextW(type);
+    m_combo_begin.GetWindowTextW(begin);
+    m_combo_end.GetWindowTextW(end);
+
+    begin.Trim();
+    if (begin.IsEmpty()) {
+        AfxMessageBox(TEXT("请输入起点"));
+        return;
+    }
+
+    end.Trim();
+    if (end.IsEmpty()) {
+        AfxMessageBox(TEXT("请设置终点"));
+        return;
+    }
+
+    if (begin == end) {
+        AfxMessageBox(TEXT("起点和终点不能相同"));
+        return;
+    }
+
+    m_engine.search(type, begin, end, output);
+    m_canvas.update();
+    SetDlgItemText(IDC_EDIT_OUTPUT, output);
+}
+
+void CNavigationDlg::OnBnClickedButtonRoute() {
+    RouteDlg dlg;
+    dlg.DoModal();
+}
+
+void CNavigationDlg::OnTimer(UINT_PTR nIDEvent) {
+    CDialogEx::OnTimer(nIDEvent);
+}

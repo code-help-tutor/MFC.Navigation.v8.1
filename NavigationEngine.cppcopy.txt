@@ -1,0 +1,236 @@
+#include "pch.h"
+#include "res/Navigation.rc"
+#include "NavigationEngine.h"
+#include "graph.h"
+
+class SpriteInfoBox : public Sprite {
+public:
+    SpriteInfoBox(int id, int left, int top, int width, int height)
+        : Sprite(id), m_left(left), m_top(top), m_width(width), m_height(height), m_mouse_x(0), m_mouse_y(0) {
+
+    }
+
+public:
+    void setMouse(int x, int y) {
+        m_mouse_x = x;
+        m_mouse_y = y;
+    }
+
+private:
+    virtual void update(Gdiplus::Graphics& graphics) {
+        Gdiplus::SolidBrush infobrush(Gdiplus::Color::Black);
+        Gdiplus::PointF point((Gdiplus::REAL)0, (Gdiplus::REAL)0);
+
+        Gdiplus::Font infofont(TEXT("Arial"), 10, Gdiplus::FontStyleRegular);
+
+        CString info;
+        info.Format(TEXT(
+            "(%d, %d)\n"
+        ), m_mouse_x, m_mouse_y);
+
+        graphics.DrawString(info, info.GetLength(), &infofont, point, &infobrush);
+    }
+
+    virtual bool hit(int x, int y) const {
+        return false;
+    }
+
+private:
+    int m_left;
+    int m_top;
+    int m_width;
+    int m_height;
+    int m_mouse_x;
+    int m_mouse_y;
+};
+
+NavigationEngine::NavigationEngine() : m_infobox(NULL), m_selected(NULL) {
+    createInfoBox();
+}
+
+NavigationEngine::~NavigationEngine() {
+
+}
+
+void NavigationEngine::countFPS(int fps) {
+
+}
+
+void NavigationEngine::onMouseEvent(MOUSE_EVENT_TYPE type, int x, int y) {
+    m_infobox->setMouse(x, y);
+}
+
+GraphInfo& NavigationEngine::getGraphInfo() {
+    return m_graph_info;
+}
+
+bool NavigationEngine::addVertex(const VertexInfo& vertex) {
+    if (m_graph_info.addVertex(vertex)) {
+        VertexInfo* info = m_graph_info.findVertex(vertex.name);
+        info->sprite = new SpriteVertex(m_sprites.generateID());
+        info->x = 100;
+        info->y = 100;
+        info->update();
+        m_sprites.add(info->sprite);
+        return true;
+    }
+    return false;
+}
+
+bool NavigationEngine::addEdge(const EdgeInfo& edge) {
+    if (m_graph_info.addEdge(edge)) {
+        EdgeInfo* info = m_graph_info.findEdge(edge.begin, edge.end);
+        info->sprite = new SpriteEdge(m_sprites.generateID());
+        m_graph_info.updateEdge(*info);
+        m_sprites.add(info->sprite);
+        return true;
+    }
+    return false;
+}
+
+//递归显示路径
+void recursivePath(GraphInfo& graph_info, Graph* graph, int* path, int begin, int end, CString& output, const char* last) {
+    if (begin != end) {
+        int cursor = path[end];
+        recursivePath(graph_info, graph, path, begin, cursor, output, graph->vertex->data[cursor].name);
+        output += graph->vertex->data[cursor].name;
+        if (strlen(last)) {
+            CString _last;
+            _last = last;
+            EdgeInfo* edge = graph_info.findEdge(_last, graph_info.m_vertex_list[cursor].name);
+            if (edge) {
+                CString weight;
+                weight.Format(TEXT(" ->[%.2lf]-> "), edge->distance);
+                output += weight;
+            }
+        }
+    }
+}
+
+//显示路径
+void showPath(GraphInfo& graph_info, Graph* graph, int* path, int begin, int end, CString& output) {
+    recursivePath(graph_info, graph, path, begin, end, output, "");
+    output += graph->vertex->data[end].name;
+}
+
+void NavigationEngine::search(const CString& category, const CString& begin, const CString& end, CString& output) {
+    bool succeed = false;
+    m_graph_info.clearHighlight();
+
+    Graph* graph = loadGraph(convertCStringToString(GRAPH_FILE).c_str());
+
+    int ibegin = m_graph_info.findVertexIndex(begin);
+    int iend = m_graph_info.findVertexIndex(end);
+    WEIGHT_TYPE distance = 0;
+    int itype = 0;
+    if (category == TEXT("火车")) {
+        itype = EDGE_WEIGHT_DIST;
+    } else if (category == TEXT("汽车")) {
+        itype = EDGE_WEIGHT_TIME;
+    }
+    int* path = dijkstraPath(graph, ibegin, iend, itype, &distance);
+    if (path) {
+        output.Format(TEXT("[%s:%.2lf]  "), category, distance);
+        int last = -1;
+        int cursor = iend;
+        CString track;
+        while (true) {
+            if (cursor == -1) break;
+            if (last != -1) {
+                EdgeInfo* edge = m_graph_info.findEdge(m_graph_info.m_vertex_list[last].name, m_graph_info.m_vertex_list[cursor].name);
+                if (edge) {
+                    CString weight;
+                    weight.Format(TEXT(" --(%.2lf)--> "), edge->distance);
+                    track = weight + m_graph_info.m_vertex_list[last].name + track;
+                    edge->highlight = true;
+                }
+                edge = m_graph_info.findEdge(m_graph_info.m_vertex_list[cursor].name, m_graph_info.m_vertex_list[last].name);
+                if (edge) {
+                    edge->highlight = true;
+                }
+            }
+            m_graph_info.m_vertex_list[cursor].highlight = true;
+            last = cursor;
+            cursor = path[cursor];
+        }
+        //showPath(m_graph_info, graph, path, ibegin, iend, output);
+        track = begin + track;
+        output += track;
+        free(path);
+    }
+    freeGraph(graph);
+    m_graph_info.update();
+}
+
+void NavigationEngine::search(MOUSE_EVENT_TYPE type, int x, int y, const CString& category, CString& begin, CString& end, CString& output) {
+    if (type == LBUTTON) {
+        VertexInfo* selected = m_graph_info.hitVertex(x, y);
+        if (selected) {
+            if (m_selected == NULL) {
+                m_selected = selected;
+                m_selected->sprite->setSelected(true);
+                begin = m_selected->name;
+            } else if (m_selected != selected) {
+                end = selected->name;
+                search(category, m_selected->name, selected->name, output);
+            }
+        }
+    } else if (type == RBUTTON) {
+        if (m_selected) {
+            m_selected->sprite->setSelected(false);
+            m_selected = NULL;
+            m_graph_info.clearHighlight();
+            m_graph_info.update();
+        }
+    }
+}
+
+void NavigationEngine::move(MOUSE_EVENT_TYPE type, int x, int y) {
+    if (type == LBUTTON) {
+        VertexInfo* selected = m_graph_info.hitVertex(x, y);
+        if (selected) {
+            if (m_selected) {
+                m_selected->sprite->setSelected(false);
+            }
+            m_selected = selected;
+            m_selected->sprite->setSelected(true);
+        }
+    } else if (type == RBUTTON) {
+        if (m_selected) {
+            m_selected->sprite->setSelected(false);
+            m_selected = NULL;
+        }
+    } else if (type == MOVE) {
+        if (m_selected) {
+            m_selected->x = x;
+            m_selected->y = y;
+        }
+    }
+    m_graph_info.update();
+}
+
+void NavigationEngine::saveFile(const CString& file) const {
+    m_graph_info.saveFile(file);
+}
+
+void NavigationEngine::loadFile(const CString& file) {
+    m_graph_info.loadFile(file);
+    m_sprites.clear();
+    createInfoBox();
+
+    for (std::vector<VertexInfo>::iterator iter = m_graph_info.m_vertex_list.begin(); iter != m_graph_info.m_vertex_list.end(); ++iter) {
+        iter->sprite = new SpriteVertex(m_sprites.generateID());
+        iter->update();
+        m_sprites.add(iter->sprite);
+    }
+    for (std::vector<EdgeInfo>::iterator iter = m_graph_info.m_edge_list.begin(); iter != m_graph_info.m_edge_list.end(); ++iter) {
+        iter->sprite = new SpriteEdge(m_sprites.generateID());
+        m_graph_info.updateEdge(*iter);
+        m_sprites.add(iter->sprite);
+    }
+}
+
+void NavigationEngine::createInfoBox() {
+    m_infobox = new SpriteInfoBox(m_sprites.generateID(), 0, 0, 100, 100);
+    m_sprites.add(m_infobox);
+}

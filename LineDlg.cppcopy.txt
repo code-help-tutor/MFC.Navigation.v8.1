@@ -1,0 +1,71 @@
+// LineDlg.cpp : implementation file
+//
+
+#include "pch.h"
+#include "Navigation.h"
+#include "LineDlg.h"
+#include "afxdialogex.h"
+
+
+// LineDlg dialog
+
+IMPLEMENT_DYNAMIC(LineDlg, CDialogEx)
+
+LineDlg::LineDlg(CWnd* pParent /*=nullptr*/)
+	: CDialogEx(IDD_LINE_DIALOG, pParent)
+{
+
+}
+
+LineDlg::~LineDlg()
+{
+}
+
+void LineDlg::DoDataExchange(CDataExchange* pDX)
+{
+	CDialogEx::DoDataExchange(pDX);
+}
+
+
+BEGIN_MESSAGE_MAP(LineDlg, CDialogEx)
+    ON_BN_CLICKED(IDOK, &LineDlg::OnBnClickedOk)
+END_MESSAGE_MAP()
+
+
+// LineDlg message handlers
+
+
+void LineDlg::OnBnClickedOk() {
+    GetDlgItemText(IDC_EDIT_NAME, m_info.name);
+    GetDlgItemText(IDC_EDIT_FIRST, m_info.first);
+    GetDlgItemText(IDC_EDIT_LAST, m_info.last);
+    GetDlgItemText(IDC_EDIT_STATIONS, m_info.stations);
+
+    m_info.name.Trim();
+    if (m_info.name.IsEmpty()) {
+        AfxMessageBox(TEXT("请设置名称"));
+        return;
+    }
+
+    m_info.first.Trim();
+    if (m_info.first.IsEmpty()) {
+        AfxMessageBox(TEXT("请设置首班车时间"));
+        return;
+    }
+
+    m_info.last.Trim();
+    if (m_info.last.IsEmpty()) {
+        AfxMessageBox(TEXT("请设置末班车时间"));
+        return;
+    }
+
+    m_info.stations.Trim();
+    if (m_info.stations.IsEmpty()) {
+        AfxMessageBox(TEXT("请设置途经站点"));
+        return;
+    }
+
+    m_info.stations.Replace(TEXT(" "), TEXT("->"));
+
+    CDialogEx::OnOK();
+}

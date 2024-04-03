@@ -1,0 +1,42 @@
+#pragma once
+
+#include "Common.h"
+#include "Sprite.h"
+#include "Engine.h"
+
+class Canvas
+{
+public:
+    Canvas();
+    virtual ~Canvas();
+
+public:
+    void init(Engine* engine, CWnd* wnd, int idc);
+    void update();
+
+private:
+    // 绘制缓冲区
+    void paintBuffer();
+    // 绘制全部图形元素
+    void updateSprites(Gdiplus::Graphics& graphics);
+
+private:
+    void countFPS();
+
+private:
+    static void startup();
+    static void shutdown();
+
+private:
+    Engine* m_engine;
+    CWnd* m_wnd;
+    int m_idc;
+    time_t m_current;
+    int m_fps;
+
+private:
+    static int s_gdiplus_conter;
+    static Gdiplus::GdiplusStartupInput s_gdiplus_input;
+    static ULONG_PTR s_gdiplus_token;
+};
+

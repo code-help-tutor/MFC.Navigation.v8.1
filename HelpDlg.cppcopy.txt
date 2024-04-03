@@ -1,0 +1,55 @@
+// HelpDlg.cpp : implementation file
+//
+
+#include "pch.h"
+#include "Navigation.h"
+#include "HelpDlg.h"
+#include "afxdialogex.h"
+
+
+// HelpDlg dialog
+
+IMPLEMENT_DYNAMIC(HelpDlg, CDialogEx)
+
+HelpDlg::HelpDlg(CWnd* pParent /*=nullptr*/)
+	: CDialogEx(IDD_HELP_DIALOG, pParent)
+{
+
+}
+
+HelpDlg::~HelpDlg()
+{
+}
+
+void HelpDlg::DoDataExchange(CDataExchange* pDX)
+{
+	CDialogEx::DoDataExchange(pDX);
+}
+
+
+BEGIN_MESSAGE_MAP(HelpDlg, CDialogEx)
+END_MESSAGE_MAP()
+
+
+// HelpDlg message handlers
+
+
+BOOL HelpDlg::OnInitDialog() {
+	CDialogEx::OnInitDialog();
+	CString text = 
+	TEXT("【管理员】\r\n")
+	TEXT("添加地点：点击添加按钮；\r\n")
+	TEXT("移动地点：鼠标左键单击地点拾取，移动鼠标确定地点的新位置，鼠标右键将地点放在新位置；\r\n")
+	TEXT("删除地点：列表中选中要删除的地点，点击删除按钮；\r\n")
+	TEXT("添加线路：(方法一)点击添加按钮，(方法二)按下CTRL后鼠标左键单击两个地点，则创建两者的连线；\r\n")
+	TEXT("删除线路：列表中选中要删除的线路，点击删除按钮；\r\n")
+	TEXT("搜索信息：搜索框输入关键词，将列出符合的地点和线路；\r\n")
+	TEXT("【用户】\r\n")
+	TEXT("选择路径：鼠标左键单击起点，再单击终点，将绘制出从起点到终点的路径；\r\n")
+	TEXT("查看地点：鼠标左键双击地点，弹出地点的详细信息；\r\n");
+
+	SetDlgItemText(IDC_STATIC_TEXT, text);
+
+	return TRUE;  // return TRUE unless you set the focus to a control
+				  // EXCEPTION: OCX Property Pages should return FALSE
+}
